@@ -127,41 +127,67 @@ async function lastNedFil(token) {
 }
 
 // Les en navngitt tabell fra arbeidsboken (via SheetJS).
-// Finner tabellen på tvers av ark ut fra dens definerte område (!ref).
-function lesTabell(workbook, navn) {
-  // Excel-tabeller havner i workbook.Workbook.Names som "navn" -> "Ark!$A$1:$F$9"
-  const names = (workbook.Workbook && workbook.Workbook.Names) || [];
-  let omr = names.find((n) => (n.Name || "").toLowerCase() === navn.toLowerCase());
-  let arkNavn, ref;
+// I denne fila ligger ikke tabellene som "Defined Names", men som
+// seksjoner på WebFeed-arket markert med rader som "1) NØKKELTALL  → tbl_kpi".
+// Vi parser arket én gang og deler det i seksjoner ut fra disse markørene.
+function parseWebFeed(workbook) {
+  const ws = workbook.Sheets["WebFeed"];
+  if (!ws) return {};
+  // Les bare kolonne A–H (kolonne I inneholder forklaringstekst, ikke data)
+  const alle = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false, defval: "" });
+  const rows = alle.map((r) => r.slice(0, 8)); // A–H
 
-  if (omr && omr.Ref) {
-    // Ref kan være "WebFeed!$A$1:$F$9" eller med apostrof "'Ark 1'!$A$1:..."
-    const m = String(omr.Ref).match(/^'?([^'!]+)'?!(.+)$/);
-    if (m) { arkNavn = m[1]; ref = m[2].replace(/\$/g, ""); }
+  const seksjoner = {};
+  let aktiv = null;     // navnet på tabellen vi fyller nå (f.eks. "tbl_kpi")
+  let ventHeader = false; // neste rad er kolonneoverskrift
+  let header = null;
+  let data = [];
+
+  const lagre = () => {
+    if (aktiv && header) {
+      seksjoner[aktiv] = [header, ...data];
+    }
+    header = null; data = [];
+  };
+
+  for (const rad of rows) {
+    const forste = String(rad[0] || "");
+    // Markørrad? f.eks. "1) NØKKELTALL  → tbl_kpi"
+    const m = forste.match(/→\s*(tbl_[a-zæøå_]+)/i);
+    if (m) {
+      lagre();                 // lagre forrige seksjon
+      aktiv = m[1].toLowerCase();
+      ventHeader = true;
+      continue;
+    }
+    if (!aktiv) continue;      // før første markør (intro-tekst) hopper vi over
+
+    // Tom rad avslutter en seksjons data
+    const heltTom = rad.every((c) => c === "" || c === null || c === undefined);
+    if (heltTom) { continue; }
+
+    if (ventHeader) {
+      header = rad.map((c) => String(c).trim());
+      ventHeader = false;
+      continue;
+    }
+    data.push(rad);
   }
-
-  // Fallback: hvis tabellnavn ikke ligger i Names, prøv et ark som heter "WebFeed"
-  let ws;
-  if (arkNavn && workbook.Sheets[arkNavn]) {
-    ws = workbook.Sheets[arkNavn];
-  } else {
-    ws = workbook.Sheets["WebFeed"] || workbook.Sheets[workbook.SheetNames[0]];
-  }
-  if (!ws) return [];
-
-  const opts = { header: 1, blankrows: false, defval: "" };
-  if (ref) opts.range = ref;
-  const rows = XLSX.utils.sheet_to_json(ws, opts);
-  return rows; // rad 0 = header
+  lagre(); // siste seksjon
+  return seksjoner;
 }
 
-// Gjør [[header...],[rad...]] om til liste av objekter
+// Gjør [header, ...rader] om til liste av objekter (kun ikke-tomme kolonner i header)
 function tilObjekter(values) {
   if (!values || !values.length) return [];
   const [header, ...rader] = values;
+  // Indekser der header faktisk har et navn
+  const kol = header
+    .map((h, i) => ({ navn: String(h).trim(), i }))
+    .filter((x) => x.navn !== "");
   return rader
-    .filter((rad) => rad.some((c) => c !== "" && c !== null && c !== undefined))
-    .map((rad) => Object.fromEntries(header.map((h, i) => [String(h), rad[i]])));
+    .filter((rad) => kol.some(({ i }) => rad[i] !== "" && rad[i] !== null && rad[i] !== undefined))
+    .map((rad) => Object.fromEntries(kol.map(({ navn, i }) => [navn, rad[i]])));
 }
 
 // ---------- Data-endepunkt ----------
@@ -179,9 +205,10 @@ app.get("/data.json", krevInnlogging, async (req, res) => {
     const buf = await lastNedFil(token);
     const workbook = XLSX.read(buf, { type: "buffer" });
 
+    const seksjoner = parseWebFeed(workbook);
     const resultater = {};
     for (const navn of TABLES) {
-      resultater[navn] = tilObjekter(lesTabell(workbook, navn));
+      resultater[navn] = tilObjekter(seksjoner[navn] || []);
     }
 
     const payload = {
