@@ -190,7 +190,14 @@ async function last(fersk = false) {
 function tegn(d) {
   const kpi = d.kpi || [];
   const finnKpi = (...nokler) => {
-    const rad = kpi.find((k) => nokler.some((n) => String(felt(k, "nokkel", "key", "id", "etikett", "navn") || "").toLowerCase().includes(n)));
+    const treff = (k) => {
+      const tekst = (
+        String(felt(k, "nokkel", "key", "id") || "") + " " +
+        String(felt(k, "etikett", "navn", "label") || "")
+      ).toLowerCase();
+      return nokler.some((n) => tekst.includes(n));
+    };
+    const rad = kpi.find(treff);
     return rad ? felt(rad, "verdi", "value", "tall") : undefined;
   };
 
