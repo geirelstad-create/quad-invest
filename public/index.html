@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Quad · Investeringsoversikt</title>
+<style>
+  :root {
+    --dyp: #0f2a32;
+    --dyp-2: #143840;
+    --teal: #2f8f86;
+    --teal-lys: #5cc0b4;
+    --sand: #efe9dd;
+    --kort: #ffffff;
+    --linje: #e6e0d3;
+    --blekk: #15282d;
+    --tekst: #1c2b2e;
+    --dempet: #6b7d7d;
+    --pluss: #2f8f6b;
+    --minus: #c2603f;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--sand);
+    color: var(--tekst);
+    line-height: 1.45;
+  }
+  .tall { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+
+  /* Topp */
+  header {
+    background: linear-gradient(160% 100% at 0% 0%, var(--dyp-2), var(--blekk));
+    color: var(--sand);
+    padding: 28px 32px 26px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+  .merke {
+    font-family: ui-serif, Georgia, serif;
+    letter-spacing: 0.34em;
+    text-transform: uppercase;
+    font-size: 12px;
+    color: var(--teal-lys);
+    margin: 0 0 6px;
+  }
+  header h1 {
+    font-family: ui-serif, Georgia, serif;
+    font-weight: 500;
+    font-size: 28px;
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+  .meta { font-size: 12px; color: #9fb3b3; text-align: right; }
+  .meta button {
+    margin-left: 10px;
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.2);
+    color: var(--sand);
+    padding: 5px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .meta button:hover { background: rgba(255,255,255,0.08); }
+
+  main { max-width: 1080px; margin: 0 auto; padding: 28px 24px 64px; }
+
+  /* Hero-tall */
+  .hero {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr 1fr;
+    gap: 1px;
+    background: var(--linje);
+    border: 1px solid var(--linje);
+    border-radius: 14px;
+    overflow: hidden;
+    margin-bottom: 28px;
+  }
+  .hero .celle { background: var(--kort); padding: 22px 24px; }
+  .hero .celle:first-child { background: var(--dyp); color: var(--sand); }
+  .celle .etikett {
+    font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--dempet); margin: 0 0 8px;
+  }
+  .hero .celle:first-child .etikett { color: var(--teal-lys); }
+  .celle .verdi {
+    font-family: ui-serif, Georgia, serif;
+    font-size: 30px; font-weight: 500; letter-spacing: -0.02em;
+  }
+  .hero .celle:first-child .verdi { font-size: 38px; }
+  .celle .under { font-size: 12px; color: var(--dempet); margin-top: 4px; }
+
+  h2 {
+    font-family: ui-serif, Georgia, serif; font-weight: 500;
+    font-size: 17px; letter-spacing: 0.02em;
+    margin: 34px 0 14px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--linje);
+  }
+  .seksjoner { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th {
+    text-align: left; font-weight: 600; font-size: 11px;
+    letter-spacing: 0.06em; text-transform: uppercase; color: var(--dempet);
+    padding: 8px 10px; border-bottom: 1px solid var(--linje);
+  }
+  th.h, td.h { text-align: right; }
+  td { padding: 9px 10px; border-bottom: 1px solid #efe9dc; }
+  tr:last-child td { border-bottom: 0; }
+  .kortboks { background: var(--kort); border: 1px solid var(--linje); border-radius: 12px; padding: 6px 14px 10px; }
+  .pluss { color: var(--pluss); }
+  .minus { color: var(--minus); }
+  .full { grid-column: 1 / -1; }
+
+  /* Stolpe for andel */
+  .andel-rad { display: flex; align-items: center; gap: 10px; }
+  .andel-spor { flex: 1; height: 6px; background: #eee5d4; border-radius: 4px; overflow: hidden; }
+  .andel-fyll { height: 100%; background: var(--teal); }
+
+  /* Historikk sparkline */
+  .spark { width: 100%; height: 120px; }
+
+  .laster, .feilmld { padding: 40px; text-align: center; color: var(--dempet); }
+  .feilmld { color: var(--minus); }
+
+  @media (max-width: 760px) {
+    .hero { grid-template-columns: 1fr; }
+    .seksjoner { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+  <header>
+    <div>
+      <p class="merke">Quad AS</p>
+      <h1>Investeringsoversikt</h1>
+    </div>
+    <div class="meta">
+      <div id="oppdatert">Laster…</div>
+      <button id="oppdater">Oppdater</button>
+      <form method="POST" action="/logout" style="display:inline">
+        <button type="submit">Logg ut</button>
+      </form>
+    </div>
+  </header>
+
+  <main id="innhold">
+    <div class="laster">Henter tall fra Excel…</div>
+  </main>
+
+<script>
+const kr = (n) =>
+  n == null || n === "" ? "–" :
+  new Intl.NumberFormat("nb-NO", { maximumFractionDigits: 0 }).format(n) + " kr";
+const pct = (n) =>
+  n == null || n === "" ? "–" :
+  new Intl.NumberFormat("nb-NO", { maximumFractionDigits: 1 }).format(n * (Math.abs(n) <= 1 ? 100 : 1)) + " %";
+const sign = (n) => (n > 0 ? "pluss" : n < 0 ? "minus" : "");
+
+// Hjelper: hent felt uavhengig av eksakt kolonnenavn
+function felt(obj, ...kandidater) {
+  for (const k of Object.keys(obj)) {
+    const lav = k.toLowerCase();
+    if (kandidater.some((c) => lav.includes(c))) return obj[k];
+  }
+  return undefined;
+}
+
+async function last(fersk = false) {
+  const innhold = document.getElementById("innhold");
+  try {
+    const r = await fetch("/data.json" + (fersk ? "?fersk=1" : ""), { credentials: "same-origin" });
+    if (r.status === 401) { location.href = "/login"; return; }
+    if (!r.ok) throw new Error((await r.json()).detalj || r.statusText);
+    const d = await r.json();
+    tegn(d);
+    document.getElementById("oppdatert").textContent =
+      "Oppdatert " + new Date(d.oppdatert).toLocaleString("nb-NO", { dateStyle: "medium", timeStyle: "short" });
+  } catch (e) {
+    innhold.innerHTML = `<div class="feilmld">Kunne ikke hente data: ${e.message}<br>Prøv å oppdatere, eller sjekk Excel-tilkoblingen.</div>`;
+  }
+}
+
+function tegn(d) {
+  const kpi = d.kpi || [];
+  const finnKpi = (...nokler) => {
+    const rad = kpi.find((k) => nokler.some((n) => String(felt(k, "nokkel", "key", "id", "etikett", "navn") || "").toLowerCase().includes(n)));
+    return rad ? felt(rad, "verdi", "value", "tall") : undefined;
+  };
+
+  const formue = finnKpi("formue", "netto");
+  const markedsverdi = finnKpi("markedsverdi", "marked");
+  const gevinst = finnKpi("gevinst");
+
+  const heroHtml = `
+    <section class="hero">
+      <div class="celle">
+        <p class="etikett">Samlet netto formue</p>
+        <div class="verdi tall">${kr(formue)}</div>
+        <div class="under">Konsolidert fra Sammendrag</div>
+      </div>
+      <div class="celle">
+        <p class="etikett">Markedsverdi</p>
+        <div class="verdi tall">${kr(markedsverdi)}</div>
+      </div>
+      <div class="celle">
+        <p class="etikett">Urealisert gevinst</p>
+        <div class="verdi tall ${sign(gevinst)}">${kr(gevinst)}</div>
+      </div>
+    </section>`;
+
+  // Aktivaklasser
+  const aktiva = d.aktiva || [];
+  const maksAndel = Math.max(...aktiva.map((a) => Number(felt(a, "andel")) || 0), 0.0001);
+  const aktivaRader = aktiva.map((a) => {
+    const navn = felt(a, "aktivaklasse", "klasse", "navn");
+    const mv = felt(a, "markedsverdi", "marked");
+    const avk = felt(a, "avkastning", "avk");
+    const andel = Number(felt(a, "andel")) || 0;
+    const andelN = andel <= 1 ? andel : andel / 100;
+    return `<tr>
+      <td>${navn ?? "–"}</td>
+      <td class="h tall">${kr(mv)}</td>
+      <td class="h tall ${sign(avk)}">${pct(avk)}</td>
+      <td style="width:120px">
+        <div class="andel-rad">
+          <div class="andel-spor"><div class="andel-fyll" style="width:${(andelN / (maksAndel <= 1 ? maksAndel : maksAndel/100) * 100).toFixed(0)}%"></div></div>
+          <span class="tall" style="font-size:12px;color:var(--dempet)">${pct(andel)}</span>
+        </div>
+      </td>
+    </tr>`;
+  }).join("");
+
+  const aktivaHtml = `
+    <div class="full">
+      <h2>Aktivaklasser</h2>
+      <div class="kortboks">
+        <table>
+          <thead><tr><th>Klasse</th><th class="h">Markedsverdi</th><th class="h">Avkastning</th><th>Andel</th></tr></thead>
+          <tbody>${aktivaRader || `<tr><td colspan="4">Ingen data</td></tr>`}</tbody>
+        </table>
+      </div>
+    </div>`;
+
+  // Eiendom
+  const eiendom = d.eiendom || [];
+  const eiendomRader = eiendom.map((e) => `<tr>
+      <td>${felt(e, "land", "navn") ?? "–"}</td>
+      <td class="h tall">${kr(felt(e, "takst", "verdi"))}</td>
+      <td class="h tall">${kr(felt(e, "egenkapital", "ek"))}</td>
+      <td class="h tall">${pct(felt(e, "leieavk", "avkastning", "avk"))}</td>
+    </tr>`).join("");
+
+  const eiendomHtml = `
+    <div>
+      <h2>Eiendom (utleie)</h2>
+      <div class="kortboks">
+        <table>
+          <thead><tr><th>Land</th><th class="h">Takst</th><th class="h">Egenkapital</th><th class="h">Leieavk.</th></tr></thead>
+          <tbody>${eiendomRader || `<tr><td colspan="4">Ingen data</td></tr>`}</tbody>
+        </table>
+      </div>
+    </div>`;
+
+  // Aksjer topp/bunn
+  const aksjer = d.aksjer || [];
+  const rad = (a) => `<tr>
+      <td>${felt(a, "aksje", "navn", "selskap") ?? "–"}</td>
+      <td class="h tall ${sign(felt(a, "avkastning", "avk"))}">${pct(felt(a, "avkastning", "avk"))}</td>
+      <td class="h tall ${sign(felt(a, "gevinst"))}">${kr(felt(a, "gevinst"))}</td>
+    </tr>`;
+  const erTopp = (a) => String(felt(a, "kategori") || "").toLowerCase().includes("topp");
+  const topp = aksjer.filter(erTopp);
+  const bunn = aksjer.filter((a) => !erTopp(a));
+  const aksjeTabell = (rader, tittel) => `
+    <div>
+      <h2>${tittel}</h2>
+      <div class="kortboks">
+        <table>
+          <thead><tr><th>Aksje</th><th class="h">Avk.</th><th class="h">Gevinst</th></tr></thead>
+          <tbody>${rader.map(rad).join("") || `<tr><td colspan="3">Ingen data</td></tr>`}</tbody>
+        </table>
+      </div>
+    </div>`;
+
+  // Historikk sparkline
+  const hist = (d.historikk || [])
+    .map((h) => ({ aar: felt(h, "aar", "år", "year"), verdi: Number(felt(h, "totalverdi", "verdi", "value")) }))
+    .filter((h) => h.verdi);
+  let histHtml = "";
+  if (hist.length > 1) {
+    const v = hist.map((h) => h.verdi);
+    const min = Math.min(...v), max = Math.max(...v);
+    const W = 600, H = 110, pad = 6;
+    const x = (i) => pad + (i / (hist.length - 1)) * (W - 2 * pad);
+    const y = (val) => H - pad - ((val - min) / (max - min || 1)) * (H - 2 * pad);
+    const linje = hist.map((h, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(h.verdi).toFixed(1)}`).join(" ");
+    const flate = `${linje} L${x(hist.length - 1).toFixed(1)},${H - pad} L${x(0).toFixed(1)},${H - pad} Z`;
+    histHtml = `
+      <div class="full">
+        <h2>Utvikling totalverdi</h2>
+        <div class="kortboks">
+          <svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+            <path d="${flate}" fill="rgba(47,143,134,0.12)"/>
+            <path d="${linje}" fill="none" stroke="var(--teal)" stroke-width="2"/>
+          </svg>
+          <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--dempet)" class="tall">
+            <span>${hist[0].aar}: ${kr(hist[0].verdi)}</span>
+            <span>${hist[hist.length-1].aar}: ${kr(hist[hist.length-1].verdi)}</span>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  document.getElementById("innhold").innerHTML =
+    heroHtml +
+    `<div class="seksjoner">` +
+      aktivaHtml +
+      aksjeTabell(topp, "Topp-aksjer") +
+      aksjeTabell(bunn, "Bunn-aksjer") +
+      eiendomHtml +
+      histHtml +
+    `</div>`;
+}
+
+document.getElementById("oppdater").addEventListener("click", () => last(true));
+last();
+</script>
+</body>
+</html>
