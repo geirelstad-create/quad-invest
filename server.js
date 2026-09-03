@@ -217,7 +217,7 @@ app.get("/data.json", krevInnlogging, async (req, res) => {
 
     const token = await hentDropboxToken();
     const buf = await lastNedFil(token);
-    const workbook = XLSX.read(buf, { type: "buffer" });
+    const workbook = XLSX.read(buf, { type: "buffer", cellNF: true }); // cellNF: ta med tallformat (trengs for å kjenne igjen prosentceller)
 
     const seksjoner = parseWebFeed(workbook);
     const resultater = {};
