@@ -171,6 +171,20 @@ function felt(obj, ...kandidater) {
   }
   return undefined;
 }
+// Hittil i år: kolonne som heter noe med "hiå", "hittil", "ytd" eller "i år"
+const ER_HIAA = (k) => /hi[åa]|hittil|ytd|i [åa]r/.test(k.toLowerCase());
+function feltHiaa(obj) {
+  for (const k of Object.keys(obj)) if (ER_HIAA(k)) return obj[k];
+  return undefined;
+}
+// Total avkastning: første avkastningskolonne som IKKE er hittil i år
+function feltAvkTotal(obj) {
+  for (const k of Object.keys(obj)) {
+    const lav = k.toLowerCase();
+    if ((lav.includes("avkastning") || lav.includes("avk")) && !ER_HIAA(k)) return obj[k];
+  }
+  return undefined;
+}
 
 async function last(fersk = false) {
   const innhold = document.getElementById("innhold");
@@ -228,13 +242,15 @@ function tegn(d) {
   const aktivaRader = aktiva.map((a) => {
     const navn = felt(a, "aktivaklasse", "klasse", "navn");
     const mv = felt(a, "markedsverdi", "marked");
-    const avk = felt(a, "avkastning", "avk");
+    const avk = feltAvkTotal(a);
+    const hiaa = feltHiaa(a);
     const andel = Number(felt(a, "andel")) || 0;
     const andelN = andel <= 1 ? andel : andel / 100;
     return `<tr>
       <td>${navn ?? "–"}</td>
       <td class="h tall">${kr(mv)}</td>
       <td class="h tall ${sign(avk)}">${pct(avk)}</td>
+      <td class="h tall ${sign(hiaa)}">${pct(hiaa)}</td>
       <td style="width:120px">
         <div class="andel-rad">
           <div class="andel-spor"><div class="andel-fyll" style="width:${(andelN / (maksAndel <= 1 ? maksAndel : maksAndel/100) * 100).toFixed(0)}%"></div></div>
@@ -249,8 +265,8 @@ function tegn(d) {
       <h2>Aktivaklasser</h2>
       <div class="kortboks">
         <table>
-          <thead><tr><th>Klasse</th><th class="h">Markedsverdi</th><th class="h">Avkastning</th><th>Andel</th></tr></thead>
-          <tbody>${aktivaRader || `<tr><td colspan="4">Ingen data</td></tr>`}</tbody>
+          <thead><tr><th>Klasse</th><th class="h">Markedsverdi</th><th class="h">Avkastning totalt</th><th class="h">Hittil i år</th><th>Andel</th></tr></thead>
+          <tbody>${aktivaRader || `<tr><td colspan="5">Ingen data</td></tr>`}</tbody>
         </table>
       </div>
     </div>`;
