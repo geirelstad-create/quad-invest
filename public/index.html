@@ -158,9 +158,10 @@
 const kr = (n) =>
   n == null || n === "" ? "–" :
   new Intl.NumberFormat("nb-NO", { maximumFractionDigits: 0 }).format(n) + " kr";
+// Prosentverdier kommer ferdig omregnet fra serveren (46,1 = 46,1 %)
 const pct = (n) =>
-  n == null || n === "" ? "–" :
-  new Intl.NumberFormat("nb-NO", { maximumFractionDigits: 1 }).format(n * (Math.abs(n) <= 1 ? 100 : 1)) + " %";
+  n == null || n === "" || isNaN(Number(n)) ? "–" :
+  new Intl.NumberFormat("nb-NO", { maximumFractionDigits: 1 }).format(Number(n)) + " %";
 const sign = (n) => (n > 0 ? "pluss" : n < 0 ? "minus" : "");
 
 // Hjelper: hent felt uavhengig av eksakt kolonnenavn
@@ -238,14 +239,13 @@ function tegn(d) {
 
   // Aktivaklasser
   const aktiva = d.aktiva || [];
-  const maksAndel = Math.max(...aktiva.map((a) => Number(felt(a, "andel")) || 0), 0.0001);
+  const maksAndel = Math.max(...aktiva.map((a) => Number(felt(a, "andel")) || 0), 0.0001); // i prosent
   const aktivaRader = aktiva.map((a) => {
     const navn = felt(a, "aktivaklasse", "klasse", "navn");
     const mv = felt(a, "markedsverdi", "marked");
     const avk = feltAvkTotal(a);
     const hiaa = feltHiaa(a);
-    const andel = Number(felt(a, "andel")) || 0;
-    const andelN = andel <= 1 ? andel : andel / 100;
+    const andel = Number(felt(a, "andel")) || 0; // i prosent (40,5)
     return `<tr>
       <td>${navn ?? "–"}</td>
       <td class="h tall">${kr(mv)}</td>
@@ -253,7 +253,7 @@ function tegn(d) {
       <td class="h tall ${sign(hiaa)}">${pct(hiaa)}</td>
       <td style="width:120px">
         <div class="andel-rad">
-          <div class="andel-spor"><div class="andel-fyll" style="width:${(andelN / (maksAndel <= 1 ? maksAndel : maksAndel/100) * 100).toFixed(0)}%"></div></div>
+          <div class="andel-spor"><div class="andel-fyll" style="width:${(andel / maksAndel * 100).toFixed(0)}%"></div></div>
           <span class="tall" style="font-size:12px;color:var(--dempet)">${pct(andel)}</span>
         </div>
       </td>

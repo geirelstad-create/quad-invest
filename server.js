@@ -133,9 +133,23 @@ async function lastNedFil(token) {
 function parseWebFeed(workbook) {
   const ws = workbook.Sheets["WebFeed"];
   if (!ws) return {};
-  // Les bare kolonne A–H (kolonne I inneholder forklaringstekst, ikke data)
-  const alle = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false, defval: "" });
-  const rows = alle.map((r) => r.slice(0, 8)); // A–H
+  // Les bare kolonne A–H (kolonne I inneholder forklaringstekst, ikke data).
+  // Vi leser cellene direkte for å se tallformatet: celler som er formatert som
+  // prosent i Excel (f.eks. 175,4 %) ligger lagret som brøk (1,754). De gjøres om
+  // til prosenttall (175,4) her, slik at dashboardet slipper å gjette.
+  const omr = XLSX.utils.decode_range(ws["!ref"] || "A1:A1");
+  const rows = [];
+  for (let r = omr.s.r; r <= omr.e.r; r++) {
+    const rad = [];
+    for (let c = 0; c < 8; c++) {
+      const celle = ws[XLSX.utils.encode_cell({ r, c })];
+      if (!celle || celle.v === undefined || celle.v === null) { rad.push(""); continue; }
+      let v = celle.v;
+      if (celle.t === "n" && typeof celle.z === "string" && celle.z.includes("%")) v = v * 100;
+      rad.push(v);
+    }
+    if (rad.some((c) => c !== "")) rows.push(rad);
+  }
 
   const seksjoner = {};
   let aktiv = null;     // navnet på tabellen vi fyller nå (f.eks. "tbl_kpi")
