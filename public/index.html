@@ -126,6 +126,47 @@
   /* Historikk sparkline */
   .spark { width: 100%; height: 120px; }
 
+  /* Avkastning med / uten Nextron */
+  .avk-par { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .avk-kort { background: var(--kort); border: 1px solid var(--linje); border-radius: 12px; padding: 16px 18px 14px; position: relative; }
+  .avk-kort.primaer { border-color: var(--teal); box-shadow: inset 3px 0 0 var(--teal); }
+  .avk-kort .tittel { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; margin: 0 0 4px; }
+  .avk-kort .prikk { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .avk-kort .merkelapp { font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--teal); background: rgba(31,154,143,.1); padding: 2px 7px; border-radius: 4px; margin-left: auto; }
+  .avk-kort .hoved { font-family: ui-serif, Georgia, serif; font-size: 34px; font-weight: 500; letter-spacing: -.02em; line-height: 1.1; margin: 6px 0 2px; }
+  .avk-kort .forklar { font-size: 12px; color: var(--dempet); margin: 0 0 12px; }
+  .avk-rad { display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0; border-top: 1px solid #efe9dc; }
+  .avk-rad span:first-child { color: var(--dempet); }
+  .notat { font-size: 12.5px; color: #41535a; background: #f7f3ea; border: 1px solid var(--linje); border-radius: 10px; padding: 12px 14px; margin-top: 14px; line-height: 1.5; }
+  .notat strong { color: var(--tekst); }
+  .notat ul { margin: 6px 0 0; padding-left: 18px; }
+  .notat li { margin: 2px 0; }
+
+  /* Linjediagram (to serier) */
+  .linjekart { width: 100%; height: auto; display: block; font-family: inherit; }
+  .linjekart .rute { stroke: #ece6d9; stroke-width: 1; }
+  .linjekart .akse { fill: var(--dempet); font-size: 11px; }
+  .linjekart .serie { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+  .linjekart .punkt { stroke: var(--kort); stroke-width: 2; }
+  .linjekart .direkte { font-size: 11.5px; font-weight: 600; fill: var(--tekst); }
+  .legende { display: flex; gap: 18px; font-size: 12.5px; color: var(--tekst); margin: 4px 0 10px; flex-wrap: wrap; }
+  .legende span { display: inline-flex; align-items: center; gap: 7px; }
+  .legende i { width: 18px; height: 3px; border-radius: 2px; display: inline-block; }
+  .kartboks { position: relative; }
+  .tips { position: absolute; pointer-events: none; background: var(--blekk); color: var(--sand); font-size: 12px; padding: 7px 10px; border-radius: 7px; white-space: nowrap; transform: translate(-50%, -110%); display: none; line-height: 1.4; }
+  .tips b { font-weight: 600; }
+  .tabellvisning { font-size: 12px; margin-top: 8px; }
+  .tabellvisning summary { cursor: pointer; color: var(--dempet); }
+  .raatabell { overflow-x: auto; }
+  .raatabell th, .raatabell td { white-space: nowrap; }
+  /* Aksjeavkastning – fire fliser */
+  .fliser { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--linje); border: 1px solid var(--linje); border-radius: 12px; overflow: hidden; }
+  .flis { background: var(--kort); padding: 16px 18px 14px; }
+  .flis .etikett { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--dempet); margin: 0 0 6px; }
+  .flis .verdi { font-family: ui-serif, Georgia, serif; font-size: 28px; font-weight: 500; letter-spacing: -.02em; line-height: 1.1; }
+  .flis .under { font-size: 12px; color: var(--dempet); margin-top: 4px; }
+  @media (max-width: 760px) { .avk-par { grid-template-columns: 1fr; } .fliser { grid-template-columns: 1fr 1fr; } }
+
   .laster, .feilmld { padding: 40px; text-align: center; color: var(--dempet); }
   .feilmld { color: var(--minus); }
 
@@ -312,12 +353,24 @@ function tegn(d) {
       </div>
     </div>`;
 
-  // Historikk sparkline
+  // ---------- Avkastning med og uten Nextron (tbl_avkastning) ----------
+  const avkTab = d.avkastning || [];
+  const avkHtml = tegnAvkastning(avkTab, kpi);
+
+  // ---------- Utvikling: totalverdi med og uten Nextron ----------
+  // Serien hentes fra tbl_avkastning hvis den har årsrader med totalverdi,
+  // ellers fra tbl_historikk (som kan ha fått en eks-Nextron-kolonne).
+  const serier = hentSerier(avkTab).length > 1 ? hentSerier(avkTab) : hentSerier(d.historikk || []);
+  const harEks = serier.some((s) => s.eks != null);
+
+  // Historikk sparkline (fallback når det ikke finnes eks-Nextron-serie)
   const hist = (d.historikk || [])
     .map((h) => ({ aar: felt(h, "aar", "år", "year"), verdi: Number(felt(h, "totalverdi", "verdi", "value")) }))
     .filter((h) => h.verdi);
   let histHtml = "";
-  if (hist.length > 1) {
+  if (harEks && serier.length > 1) {
+    histHtml = tegnLinjekart(serier);
+  } else if (hist.length > 1) {
     const v = hist.map((h) => h.verdi);
     const min = Math.min(...v), max = Math.max(...v);
     const W = 600, H = 110, pad = 6;
@@ -344,12 +397,277 @@ function tegn(d) {
   document.getElementById("innhold").innerHTML =
     heroHtml +
     `<div class="seksjoner">` +
-      aktivaHtml +
+      avkHtml +
+      tegnAksjeavk(d) +
       aksjeTabell(topp, "Topp-aksjer") +
       aksjeTabell(bunn, "Bunn-aksjer") +
+      aktivaHtml +
       eiendomHtml +
       histHtml +
     `</div>`;
+  kobleTips();
+}
+
+// =====================================================================
+//  Avkastning med / uten Nextron
+// =====================================================================
+const FARGE_MED = "#c2603f";   // med Nextron (hopper mye)
+const FARGE_EKS = "#1f9a8f";   // eks. Nextron (den handlebare porteføljen)
+
+const norm = (s) => String(s ?? "").toLowerCase().replace(/[\s._\-/()]+/g, " ").trim();
+const ER_EKS  = (t) => /\b(eks|ekskl|ekskludert|uten|ex|excl|without)\b/.test(t) && /nextron/.test(t);
+const ER_MED  = (t) => !ER_EKS(t);
+const ER_YTDM = (t) => /forrige|forr m|foreg|inkl|siste m|prev|last m|t o m|til og med|per m/.test(t);
+const ER_HIAA_T = (t) => /hi[åa]\b|hittil|ytd|i [åa]r|s[åa] langt/.test(t);
+const ER_AVK  = (t) => /avk|return|pct|prosent|%/.test(t);
+const ER_AAR  = (t) => /^(aar|år|year|periode|dato|date)$/.test(t) || /\b(aar|år|year)\b/.test(t);
+const tall = (v) => (v === "" || v == null || isNaN(Number(v)) ? null : Number(v));
+
+// Bygg en flat liste av {tekst, verdi}-kandidater fra en tabell, uavhengig av
+// om den er lagt opp som nøkkel/verdi-rader eller som årsrader med mange kolonner.
+function kandidater(rader, kilde) {
+  const ut = [];
+  if (!rader.length) return ut;
+  const kol = Object.keys(rader[0]);
+  const aarKol = kol.find((k) => ER_AAR(norm(k)));
+  const verdiKol = kol.find((k) => /^(verdi|value|tall|bel[øo]p)$/.test(norm(k)));
+  // Nøkkel/verdi-layout: én verdikolonne, resten tekst
+  if (verdiKol) {
+    for (const r of rader) {
+      const tekst = norm(kol.filter((k) => k !== verdiKol).map((k) => r[k]).join(" "));
+      ut.push({ tekst, verdi: tall(r[verdiKol]), kilde, rad: r });
+    }
+  }
+  // Årsrad-layout: sammendragsrad ("Totalt", "Hittil i år"…) eller siste rad
+  if (aarKol) {
+    const sammendrag = rader.filter((r) => isNaN(Number(r[aarKol])) && String(r[aarKol]).trim() !== "");
+    const siste = rader.filter((r) => !isNaN(Number(r[aarKol])) && r[aarKol] !== "").slice(-1);
+    for (const r of [...sammendrag, ...siste]) {
+      const radTekst = norm(r[aarKol]);
+      for (const k of kol) {
+        if (k === aarKol) continue;
+        const v = tall(r[k]);
+        if (v == null) continue;
+        ut.push({ tekst: norm(k) + " " + radTekst, verdi: v, kilde, rad: r, kolonne: k });
+      }
+    }
+  }
+  return ut;
+}
+
+// Finn et prosenttall: eks/med Nextron × periode (total | hiaa | ytdm)
+function finnProsent(kand, eks, periode) {
+  const treff = kand.filter((c) => {
+    const t = c.tekst;
+    if (!ER_AVK(t) && !c.kolonne) return false;
+    if (c.kolonne && !ER_AVK(t)) return false;     // kolonner må hete noe med avkastning/pct
+    if (eks ? !ER_EKS(t) : ER_EKS(t)) return false;
+    const ytdm = ER_YTDM(t), hiaa = ER_HIAA_T(t);
+    if (periode === "ytdm") return ytdm;
+    if (periode === "hiaa") return hiaa && !ytdm;
+    return !hiaa && !ytdm;
+  });
+  return treff.length ? treff[0].verdi : undefined;
+}
+
+function tegnAvkastning(avkTab, kpi) {
+  const kand = [...kandidater(avkTab, "avkastning"), ...kandidater(kpi, "kpi")];
+  const med  = { total: finnProsent(kand, false, "total"), hiaa: finnProsent(kand, false, "hiaa"), ytdm: finnProsent(kand, false, "ytdm") };
+  const eks  = { total: finnProsent(kand, true,  "total"), hiaa: finnProsent(kand, true,  "hiaa"), ytdm: finnProsent(kand, true,  "ytdm") };
+  // Nextrons andel av firmaverdien (fra tbl_avkastning eller tbl_kpi)
+  const andelNextron = kand.find((c) => /nextron/.test(c.tekst) && /andel|share|vekt/.test(c.tekst))?.verdi;
+
+  const harNoe = [med.total, eks.total, med.hiaa, eks.hiaa, med.ytdm, eks.ytdm].some((v) => v != null);
+
+  const kort = (tittel, farge, v, primaer, forklar, merkelapp) => `
+    <div class="avk-kort ${primaer ? "primaer" : ""}">
+      <p class="tittel"><span class="prikk" style="background:${farge}"></span>${tittel}${merkelapp ? `<span class="merkelapp">${merkelapp}</span>` : ""}</p>
+      <div class="hoved tall ${sign(v.total)}">${pct(v.total)}</div>
+      <p class="forklar">${forklar}</p>
+      <div class="avk-rad"><span>Hittil i år</span><span class="tall ${sign(v.hiaa)}">${pct(v.hiaa)}</span></div>
+      <div class="avk-rad"><span>Hittil i år inkl. forrige måned</span><span class="tall ${sign(v.ytdm)}">${pct(v.ytdm)}</span></div>
+    </div>`;
+
+  const andelTekst = andelNextron != null ? ` Nextron utgjør ${pct(andelNextron)} av firmaverdien.` : "";
+
+  let innhold;
+  if (harNoe) {
+    innhold = `
+      <div class="avk-par">
+        ${kort("Eks. Nextron", FARGE_EKS, eks, true, "Den handlebare porteføljen – det representative tallet.", "Representativt")}
+        ${kort("Med Nextron", FARGE_MED, med, false, "Drevet av Nextron-verdien." + andelTekst, "")}
+      </div>`;
+  } else {
+    // Fant ikke kolonnene vi lette etter – vis tabellen rått så det er lett å se hva som må justeres
+    innhold = `<div class="kortboks raatabell">${raaTabell(avkTab, "tbl_avkastning ble lest, men kolonnene ble ikke gjenkjent. Rå innhold:")}</div>`;
+  }
+
+  return `
+    <div class="full">
+      <h2>Avkastning</h2>
+      ${innhold}
+      <div class="notat">
+        <strong>Nextron er ikke børsnotert.</strong> Verdien er modellberegnet etter aksjonæravtalens punkt 8.6 (EV/EBIT), ikke en markedspris.
+        Avkastningen «med Nextron» svinger derfor med modellen, ikke med et marked.
+      </div>
+      ${avkTab.length ? `<details class="tabellvisning"><summary>Vis tbl_avkastning som tabell</summary><div class="kortboks raatabell" style="margin-top:8px">${raaTabell(avkTab)}</div></details>` : ""}
+    </div>`;
+}
+
+function raaTabell(rader, tittel) {
+  if (!rader.length) return `<p style="font-size:13px;color:var(--dempet)">Ingen data i tbl_avkastning.</p>`;
+  const kol = Object.keys(rader[0]);
+  const fmt = (v) => (tall(v) == null ? (v ?? "") : new Intl.NumberFormat("nb-NO", { maximumFractionDigits: 2 }).format(Number(v)));
+  return `${tittel ? `<p style="font-size:13px;color:var(--dempet)">${tittel}</p>` : ""}
+    <table><thead><tr>${kol.map((k) => `<th>${k}</th>`).join("")}</tr></thead>
+    <tbody>${rader.map((r) => `<tr>${kol.map((k) => `<td class="${tall(r[k]) != null ? "h tall" : ""}">${fmt(r[k])}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+}
+
+// Årsrader -> [{aar, med, eks}] fra kolonner totalverdi_kr / totalverdi_eks_nextron_kr
+function hentSerier(rader) {
+  if (!rader.length) return [];
+  const kol = Object.keys(rader[0]);
+  const aarKol = kol.find((k) => ER_AAR(norm(k)));
+  if (!aarKol) return [];
+  const erVerdi = (k) => /totalverdi|total verdi|verdi kr|sum|formue/.test(norm(k)) && !ER_AVK(norm(k));
+  const eksKol = kol.find((k) => erVerdi(k) && ER_EKS(norm(k)));
+  const medKol = kol.find((k) => erVerdi(k) && !ER_EKS(norm(k)));
+  if (!medKol) return [];
+  return rader
+    .filter((r) => r[aarKol] !== "" && !isNaN(Number(r[aarKol])))
+    .map((r) => ({ aar: String(r[aarKol]), med: tall(r[medKol]), eks: eksKol ? tall(r[eksKol]) : null }))
+    .filter((r) => r.med != null || r.eks != null);
+}
+
+const mill = (n) => (n == null ? "–" : new Intl.NumberFormat("nb-NO", { maximumFractionDigits: 1 }).format(n / 1e6) + " mill.");
+
+function tegnLinjekart(serier) {
+  const W = 760, H = 300, m = { t: 22, r: 118, b: 34, l: 64 };
+  const alle = serier.flatMap((s) => [s.med, s.eks]).filter((v) => v != null);
+  const rawMin = Math.min(...alle), rawMax = Math.max(...alle);
+  const spenn = rawMax - rawMin || rawMax || 1;
+  // Fint avrundet y-akse med litt luft
+  const steg = Math.pow(10, Math.floor(Math.log10(spenn))) * (spenn / Math.pow(10, Math.floor(Math.log10(spenn))) > 5 ? 2 : spenn / Math.pow(10, Math.floor(Math.log10(spenn))) > 2 ? 1 : 0.5);
+  const yMin = Math.max(0, Math.floor((rawMin - spenn * 0.08) / steg) * steg);
+  const yMax = Math.ceil((rawMax + spenn * 0.08) / steg) * steg;
+  const x = (i) => m.l + (serier.length === 1 ? 0 : (i / (serier.length - 1)) * (W - m.l - m.r));
+  const y = (v) => m.t + (1 - (v - yMin) / (yMax - yMin)) * (H - m.t - m.b);
+  const sti = (nokkel) => serier.map((s, i) => (s[nokkel] == null ? null : `${x(i).toFixed(1)},${y(s[nokkel]).toFixed(1)}`)).filter(Boolean).map((p, i) => (i ? "L" : "M") + p).join(" ");
+
+  const ruter = [];
+  for (let v = yMin; v <= yMax + 1e-9; v += steg) {
+    ruter.push(`<line class="rute" x1="${m.l}" x2="${W - m.r}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}"/>
+      <text class="akse" x="${m.l - 8}" y="${(y(v) + 4).toFixed(1)}" text-anchor="end">${new Intl.NumberFormat("nb-NO", { maximumFractionDigits: 0 }).format(v / 1e6)}</text>`);
+  }
+  const xTekst = serier.map((s, i) => `<text class="akse" x="${x(i).toFixed(1)}" y="${H - 10}" text-anchor="middle">${s.aar}</text>`).join("");
+  const punkter = (nokkel, farge) => serier.map((s, i) => (s[nokkel] == null ? "" : `<circle class="punkt" cx="${x(i).toFixed(1)}" cy="${y(s[nokkel]).toFixed(1)}" r="4" fill="${farge}"/>`)).join("");
+  const sisteI = serier.length - 1;
+  // Direkte etiketter ved siste punkt – dyttes fra hverandre hvis de kolliderer
+  let yMed = serier[sisteI].med != null ? y(serier[sisteI].med) : null;
+  let yEks = serier[sisteI].eks != null ? y(serier[sisteI].eks) : null;
+  if (yMed != null && yEks != null && Math.abs(yMed - yEks) < 14) { const midt = (yMed + yEks) / 2; yMed = midt + (yMed >= yEks ? 7 : -7); yEks = midt + (yEks > yMed ? 7 : -7); }
+  const etikett = (yy, farge, tekst) => yy == null ? "" : `<text class="direkte" x="${(x(sisteI) + 10).toFixed(1)}" y="${(yy + 4).toFixed(1)}"><tspan fill="${farge}">●</tspan> ${tekst}</text>`;
+
+  const svg = `
+    <svg class="linjekart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Totalverdi per år, med og uten Nextron">
+      ${ruter.join("")}
+      <text class="akse" x="${m.l - 8}" y="12" text-anchor="end">mill. kr</text>
+      <path class="serie" d="${sti("med")}" stroke="${FARGE_MED}"/>
+      <path class="serie" d="${sti("eks")}" stroke="${FARGE_EKS}"/>
+      ${punkter("med", FARGE_MED)}${punkter("eks", FARGE_EKS)}
+      ${etikett(yMed, FARGE_MED, "Med Nextron")}${etikett(yEks, FARGE_EKS, "Eks. Nextron")}
+      ${xTekst}
+      <line id="kryss" x1="0" x2="0" y1="${m.t}" y2="${H - m.b}" stroke="#b9b0a0" stroke-dasharray="3 3" style="display:none"/>
+      ${serier.map((s, i) => `<rect class="treff" data-i="${i}" x="${(x(i) - (W - m.l - m.r) / (2 * Math.max(serier.length - 1, 1))).toFixed(1)}" y="${m.t}" width="${((W - m.l - m.r) / Math.max(serier.length - 1, 1)).toFixed(1)}" height="${H - m.t - m.b}" fill="transparent"/>`).join("")}
+    </svg>`;
+
+  return `
+    <div class="full">
+      <h2>Utvikling totalverdi – med og uten Nextron</h2>
+      <div class="kortboks kartboks" id="kartboks">
+        <div class="legende">
+          <span><i style="background:${FARGE_MED}"></i>Med Nextron</span>
+          <span><i style="background:${FARGE_EKS}"></i>Eks. Nextron (handlebar portefølje)</span>
+        </div>
+        ${svg}
+        <div class="tips" id="tips"></div>
+        <details class="tabellvisning"><summary>Vis som tabell</summary>
+          <table style="margin-top:6px"><thead><tr><th>År</th><th class="h">Med Nextron</th><th class="h">Eks. Nextron</th><th class="h">Nextron-andel</th></tr></thead>
+          <tbody>${serier.map((s) => `<tr><td>${s.aar}</td><td class="h tall">${kr(s.med)}</td><td class="h tall">${kr(s.eks)}</td><td class="h tall">${s.med && s.eks != null ? pct((s.med - s.eks) / s.med * 100) : "–"}</td></tr>`).join("")}</tbody></table>
+        </details>
+      </div>
+      <div class="notat">
+        <strong>Forbehold – serien er ikke fullt sammenlignbar over tid.</strong>
+        <ul>
+          <li>Privat netto formue (36,5 mill.) ligger bare i 2026-raden.</li>
+          <li>Firmaets eiendomsgjeld mangler for 2022–2025.</li>
+          <li>Eiendom føres til kostpris 2022–2025, men til takstverdi i 2026.</li>
+          <li>Nextron-verdien bytter metodegrunnlag mellom 2024 (årsmodell) og 2025 (månedsmodell).</li>
+        </ul>
+        Utviklingen bør derfor leses som nivåer, ikke som en ren avkastningsserie.
+      </div>
+    </div>`;
+}
+
+// =====================================================================
+//  Aksjeavkastning – nøkler aksjeavk_total / _hia / _mtd / _i_dag (enhet pct)
+//  Leter gjennom alle tbl_*-seksjoner på WebFeed-arket etter nøklene.
+// =====================================================================
+function finnNokkel(d, nokkel) {
+  const alle = [...Object.values(d.tabeller || {}), d.kpi || [], d.avkastning || []].flat();
+  for (const rad of alle) {
+    const k = norm(felt(rad, "nokkel", "nøkkel", "key", "id") ?? rad[Object.keys(rad)[0]]);
+    if (k === norm(nokkel)) {
+      const v = tall(felt(rad, "verdi", "value", "tall"));
+      const enhet = norm(felt(rad, "enhet", "unit") ?? "pct");
+      return { verdi: v, enhet, etikett: felt(rad, "etikett", "label", "navn") };
+    }
+  }
+  return null;
+}
+
+function tegnAksjeavk(d) {
+  const fliser = [
+    { nokkel: "aksjeavk_total", etikett: "Total" },
+    { nokkel: "aksjeavk_hia",   etikett: "Hittil i år" },
+    { nokkel: "aksjeavk_mtd",   etikett: "Hittil denne måneden" },
+    { nokkel: "aksjeavk_i_dag", etikett: "I dag" },
+  ].map((f) => ({ ...f, data: finnNokkel(d, f.nokkel) }));
+  if (!fliser.some((f) => f.data && f.data.verdi != null)) return ""; // ikke lagt inn i Excel ennå
+  const vis = (x) => x.enhet && /kr|nok/.test(x.enhet) ? kr(x.verdi) : pct(x.verdi);
+  return `
+    <div class="full">
+      <h2>Aksjeavkastning</h2>
+      <div class="fliser">
+        ${fliser.map((f) => `
+          <div class="flis">
+            <p class="etikett">${f.etikett}</p>
+            <div class="verdi tall ${f.data ? sign(f.data.verdi) : ""}">${f.data ? vis(f.data) : "–"}</div>
+          </div>`).join("")}
+      </div>
+    </div>`;
+}
+
+// Kryss + tooltip på linjediagrammet (kobles på etter hver tegning)
+function kobleTips() {
+  const boks = document.getElementById("kartboks");
+  if (!boks) return;
+  const svg = boks.querySelector("svg"), tips = document.getElementById("tips"), kryss = svg.querySelector("#kryss");
+  const serier = [...boks.querySelectorAll("tbody tr")].map((tr) => [...tr.children].map((td) => td.textContent));
+  svg.querySelectorAll(".treff").forEach((r) => {
+    r.addEventListener("mouseenter", () => {
+      const i = Number(r.dataset.i), rad = serier[i];
+      const cx = svg.querySelectorAll(".treff")[i];
+      const xMid = Number(cx.getAttribute("x")) + Number(cx.getAttribute("width")) / 2;
+      kryss.setAttribute("x1", xMid); kryss.setAttribute("x2", xMid); kryss.style.display = "";
+      const bb = svg.getBoundingClientRect(), vb = svg.viewBox.baseVal;
+      tips.style.left = (xMid / vb.width * bb.width) + "px";
+      tips.style.top = (bb.top - boks.getBoundingClientRect().top + 24) + "px";
+      tips.innerHTML = `<b>${rad[0]}</b><br>Med Nextron: ${rad[1]}<br>Eks. Nextron: ${rad[2]}`;
+      tips.style.display = "block";
+    });
+    r.addEventListener("mouseleave", () => { tips.style.display = "none"; kryss.style.display = "none"; });
+  });
 }
 
 document.getElementById("oppdater").addEventListener("click", () => last(true));
