@@ -35,7 +35,7 @@ const {
 } = process.env;
 
 // Navngitte tabeller på WebFeed-arket (laget av Claude for Excel)
-const TABLES = ["tbl_kpi", "tbl_aktiva", "tbl_eiendom", "tbl_aksjer", "tbl_historikk"];
+const TABLES = ["tbl_kpi", "tbl_aktiva", "tbl_eiendom", "tbl_aksjer", "tbl_historikk", "tbl_avkastning"];
 
 app.set("trust proxy", 1); // Render sitter bak en proxy — kreves for secure cookies
 app.use(express.urlencoded({ extended: true }));
@@ -48,7 +48,7 @@ app.use(
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      secure: true,        // kun over HTTPS (Render kjører HTTPS)
+      secure: process.env.NODE_ENV !== "test",        // kun over HTTPS (Render kjører HTTPS)
       sameSite: "lax",
       maxAge: 1000 * 60 * 60 * 8, // 8 timer
     },
@@ -133,15 +133,18 @@ async function lastNedFil(token) {
 function parseWebFeed(workbook) {
   const ws = workbook.Sheets["WebFeed"];
   if (!ws) return {};
-  // Les bare kolonne A–H (kolonne I inneholder forklaringstekst, ikke data).
   // Vi leser cellene direkte for å se tallformatet: celler som er formatert som
   // prosent i Excel (f.eks. 175,4 %) ligger lagret som brøk (1,754). De gjøres om
   // til prosenttall (175,4) her, slik at dashboardet slipper å gjette.
+  // Leser inntil 16 kolonner (tbl_avkastning har flere kolonner enn de gamle
+  // tabellene). Kolonner uten navn i overskriftsraden (f.eks. forklaringstekst)
+  // filtreres bort i tilObjekter().
   const omr = XLSX.utils.decode_range(ws["!ref"] || "A1:A1");
+  const MAKS_KOL = Math.min(16, omr.e.c + 1);
   const rows = [];
   for (let r = omr.s.r; r <= omr.e.r; r++) {
     const rad = [];
-    for (let c = 0; c < 8; c++) {
+    for (let c = 0; c < MAKS_KOL; c++) {
       const celle = ws[XLSX.utils.encode_cell({ r, c })];
       if (!celle || celle.v === undefined || celle.v === null) { rad.push(""); continue; }
       let v = celle.v;
@@ -224,6 +227,10 @@ app.get("/data.json", krevInnlogging, async (req, res) => {
     for (const navn of TABLES) {
       resultater[navn] = tilObjekter(seksjoner[navn] || []);
     }
+    // Alle tbl_*-seksjoner som finnes på arket (også nye vi ikke kjenner navnet på),
+    // slik at dashboardet kan lete etter nøkler som f.eks. aksjeavk_total.
+    const tabeller = {};
+    for (const navn of Object.keys(seksjoner)) tabeller[navn] = tilObjekter(seksjoner[navn]);
 
     const payload = {
       oppdatert: new Date().toISOString(),
@@ -233,6 +240,8 @@ app.get("/data.json", krevInnlogging, async (req, res) => {
       eiendom: resultater.tbl_eiendom,
       aksjer: resultater.tbl_aksjer,
       historikk: resultater.tbl_historikk,
+      avkastning: resultater.tbl_avkastning, // med/uten Nextron, hittil i år, YTD inkl. forrige måned
+      tabeller,                              // alle tbl_*-seksjoner, bl.a. aksjeavk_* (nøkkel/verdi/enhet)
     };
 
     _cache = { data: payload, exp: naa + 5 * 60 * 1000 }; // 5 min cache
