@@ -417,9 +417,9 @@ const FARGE_EKS = "#1f9a8f";   // eks. Nextron (den handlebare porteføljen)
 const norm = (s) => String(s ?? "").toLowerCase().replace(/[\s._\-/()]+/g, " ").trim();
 const ER_EKS  = (t) => /\b(eks|ekskl|ekskludert|uten|ex|excl|without)\b/.test(t) && /nextron/.test(t);
 const ER_MED  = (t) => !ER_EKS(t);
-const ER_YTDM = (t) => /forrige|forr m|foreg|inkl|siste m|prev|last m|t o m|til og med|per m/.test(t);
+const ER_YTDM = (t) => /forrige|forr m|foreg|siste m|prev m|last m|t o m|til og med/.test(t);
 const ER_HIAA_T = (t) => /hi[åa]\b|hittil|ytd|i [åa]r|s[åa] langt/.test(t);
-const ER_AVK  = (t) => /avk|return|pct|prosent|%/.test(t);
+const ER_AVK  = (t) => /avk|return|yield/.test(t) && !/andel|share|vekt|markedsverdi|kostpris|gevinst/.test(t);
 const ER_AAR  = (t) => /^(aar|år|year|periode|dato|date)$/.test(t) || /\b(aar|år|year)\b/.test(t);
 const tall = (v) => (v === "" || v == null || isNaN(Number(v)) ? null : Number(v));
 
@@ -477,6 +477,8 @@ function tegnAvkastning(avkTab, kpi) {
   // Nextrons andel av firmaverdien (fra tbl_avkastning eller tbl_kpi)
   const andelNextron = kand.find((c) => /nextron/.test(c.tekst) && /andel|share|vekt/.test(c.tekst))?.verdi;
 
+  // Vis en rad hvis minst ett av kortene har tallet (så kortene blir like høye)
+  const visAlle = { hiaa: med.hiaa != null || eks.hiaa != null, ytdm: med.ytdm != null || eks.ytdm != null };
   const harNoe = [med.total, eks.total, med.hiaa, eks.hiaa, med.ytdm, eks.ytdm].some((v) => v != null);
 
   const kort = (tittel, farge, v, primaer, forklar, merkelapp) => `
@@ -484,8 +486,8 @@ function tegnAvkastning(avkTab, kpi) {
       <p class="tittel"><span class="prikk" style="background:${farge}"></span>${tittel}${merkelapp ? `<span class="merkelapp">${merkelapp}</span>` : ""}</p>
       <div class="hoved tall ${sign(v.total)}">${pct(v.total)}</div>
       <p class="forklar">${forklar}</p>
-      <div class="avk-rad"><span>Hittil i år</span><span class="tall ${sign(v.hiaa)}">${pct(v.hiaa)}</span></div>
-      <div class="avk-rad"><span>Hittil i år inkl. forrige måned</span><span class="tall ${sign(v.ytdm)}">${pct(v.ytdm)}</span></div>
+      ${v.hiaa != null || visAlle.hiaa ? `<div class="avk-rad"><span>Hittil i år</span><span class="tall ${sign(v.hiaa)}">${pct(v.hiaa)}</span></div>` : ""}
+      ${v.ytdm != null || visAlle.ytdm ? `<div class="avk-rad"><span>Hittil i år inkl. forrige måned</span><span class="tall ${sign(v.ytdm)}">${pct(v.ytdm)}</span></div>` : ""}
     </div>`;
 
   const andelTekst = andelNextron != null ? ` Nextron utgjør ${pct(andelNextron)} av firmaverdien.` : "";
